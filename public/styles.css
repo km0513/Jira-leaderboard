@@ -30,6 +30,41 @@ h1 {
 /* Small hint under the table */
 .hint { margin: 10px 0 14px; color: #475569; font-size: 13px; }
 
+/* =========================================
+   Responsive (mobile-first tweaks)
+   ========================================= */
+@media (max-width: 640px) {
+  body { padding: 12px; }
+  main { max-width: 100%; }
+
+  h1 { font-size: 24px; }
+  .status { font-size: 13px; padding: 8px 10px; }
+
+  /* Countdown becomes 2x2 grid */
+  .countdown { padding: 10px; }
+  .countdown-row { flex-wrap: wrap; }
+  .countdown-kpi { min-width: calc(50% - 6px); padding: 8px; }
+  .countdown-kpi span { font-size: 18px; }
+  .countdown-kpi label { font-size: 10px; }
+
+  /* Table: allow horizontal scroll on small screens */
+  .board { display: block; overflow-x: auto; white-space: nowrap; border-spacing: 0; }
+  .board thead th, .board td { padding: 10px 12px; }
+  .board th:first-child, .board td:first-child { position: sticky; left: 0; background: inherit; z-index: 2; }
+  .board thead th:first-child { z-index: 3; }
+  .board thead th { font-size: 13px; }
+  .board td { font-size: 14px; }
+
+  /* KPI badges smaller on mobile */
+  .kpi { padding: 6px 10px; font-size: 14px; }
+
+  /* Hint spacing */
+  .hint { font-size: 12px; margin: 8px 0 12px; }
+
+  /* Footer */
+  .app-foot { font-size: 12px; text-align: center; color: #64748b; margin-top: 10px; }
+}
+
 /* Countdown section */
 .countdown {
   margin: 12px 0 20px;
