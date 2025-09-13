@@ -152,6 +152,26 @@ async function fetchCounts() {
   // Auto-refresh disabled as requested
 })();
 
+// Manual Refresh for counts and movers
+(function setupRefresh() {
+  const btn = document.getElementById('refresh-btn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Refreshing…';
+    try {
+      await fetchCounts();
+      await renderMovers();
+    } catch (_) {
+      // ignore errors here; status area shows failures
+    } finally {
+      btn.textContent = original;
+      btn.disabled = false;
+    }
+  });
+})();
+
 // Countdown to the next 15th 6:00 PM IST
 (function setupCountdown() {
   const dEl = document.getElementById('cd-days');

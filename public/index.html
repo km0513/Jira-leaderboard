@@ -15,7 +15,9 @@
     <main>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
         <h1>PRISM BugBash Status Board</h1>
-        <button id="theme-toggle" aria-label="Toggle dark mode" class="theme-toggle">🌙</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button id="theme-toggle" aria-label="Toggle dark mode" class="theme-toggle">🌙</button>
+        </div>
       </div>
 
       <section class="countdown" aria-labelledby="countdown-title">
@@ -61,7 +63,9 @@
       <p class="hint">Tip: All metrics are clickable Jira links. <br> Note: Manual aggregation may show minor mismatches if issues are reopened during the event.</p>
 
       <section class="filters" aria-labelledby="movers-title" id="movers">
-        <h2 id="movers-title">Top Movers</h2>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <h2 id="movers-title" style="margin:0;">Top Movers</h2>
+        </div>
         <p class="filters-note">Top movers for QA and Dev</p>
         <div class="movers-grid">
           <div>

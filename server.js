@@ -24,6 +24,18 @@ function loadEnv(envPath = path.join(__dirname, '.env')) {
   }
 }
 
+// Simple in-memory cache (per server process) with TTL
+const CACHE = new Map();
+function cacheGet(key) {
+  const hit = CACHE.get(key);
+  if (!hit) return null;
+  if (hit.expireAt && Date.now() > hit.expireAt) { CACHE.delete(key); return null; }
+  return hit.value;
+}
+function cacheSet(key, value, ttlMs) {
+  CACHE.set(key, { value, expireAt: ttlMs ? Date.now() + ttlMs : 0 });
+}
+
 function getAuthHeaders() {
   if (!JIRA_BASE_URL || !JIRA_EMAIL || !JIRA_API_TOKEN) {
     throw new Error('Missing Jira configuration (JIRA_BASE_URL/JIRA_EMAIL/JIRA_API_TOKEN)');
@@ -64,7 +76,8 @@ function withinWindow(ts, since, until) {
 
 async function countTransitionsByUser(issues, fromName, toName, since, until, notFromName, notToName) {
   const counts = new Map(); // author.displayName => number
-  for (const issue of issues) {
+
+  async function processIssue(issue) {
     let startAt = 0;
     let total = 0;
     do {
@@ -93,6 +106,23 @@ async function countTransitionsByUser(issues, fromName, toName, since, until, no
       if (histories.length === 0) break;
     } while (startAt < total);
   }
+
+  async function mapLimit(arr, limit, iter) {
+    const pending = new Set();
+    for (const item of arr) {
+      const p = Promise.resolve().then(() => iter(item));
+      pending.add(p);
+      p.finally(() => pending.delete(p));
+      if (pending.size >= limit) {
+        await Promise.race(pending);
+      }
+    }
+    await Promise.all(pending);
+  }
+
+  const concurrency = Math.max(1, Math.min(10, Number(process.env.MOVERS_CONCURRENCY || 5)));
+  await mapLimit(issues, concurrency, processIssue);
+
   const arr = Array.from(counts.entries()).map(([user, count]) => ({ user, count }));
   arr.sort((a, b) => b.count - a.count || a.user.localeCompare(b.user));
   return arr;
@@ -109,16 +139,25 @@ async function handleMovers(req, res) {
     const since = url.searchParams.get('since');
     const until = url.searchParams.get('until');
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10) || 20, 100);
+    const maxIssues = Math.min(parseInt(url.searchParams.get('maxIssues') || '150', 10) || 150, 1000);
+    const concurrencyParam = Math.min(parseInt(url.searchParams.get('concurrency') || '0', 10) || 0, 20);
+    const ttl = Math.min(parseInt(url.searchParams.get('ttl') || '60', 10) || 60, 600) * 1000;
 
     if (!filter) return sendJSON(res, 400, { error: 'Missing required query param: filter' });
     const jqlOrFilter = toJql(filter);
     if (!jqlOrFilter) return sendJSON(res, 400, { error: 'Invalid filter/JQL' });
 
     const jql = jqlOrFilter; // filter=NN or raw JQL
-    const issues = await searchIssues(jql, 500);
+    const cacheKey = JSON.stringify({ jql, from, to, notFrom, notTo, since, until, limit, maxIssues, concurrencyParam });
+    const cached = cacheGet(cacheKey);
+    if (cached) {
+      return sendJSON(res, 200, cached);
+    }
+
+    const issues = await searchIssues(jql, maxIssues);
     const results = await countTransitionsByUser(issues, from, to, since, until, notFrom, notTo);
     const top = results.slice(0, limit);
-    return sendJSON(res, 200, {
+    const payload = {
       filter,
       from: from || null,
       to: to || null,
@@ -128,7 +167,9 @@ async function handleMovers(req, res) {
       until: until || null,
       totalIssues: issues.length,
       users: top,
-    });
+    };
+    cacheSet(cacheKey, payload, ttl);
+    return sendJSON(res, 200, payload);
   } catch (err) {
     return sendJSON(res, 500, { error: String(err && err.message || err) });
   }

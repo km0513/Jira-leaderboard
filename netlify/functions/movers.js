@@ -23,6 +23,18 @@ function cleanEnv(v) {
   return s.trim();
 }
 
+// Simple in-memory cache (per lambda instance) with TTL
+const CACHE = new Map();
+function cacheGet(key) {
+  const hit = CACHE.get(key);
+  if (!hit) return null;
+  if (hit.expireAt && Date.now() > hit.expireAt) { CACHE.delete(key); return null; }
+  return hit.value;
+}
+function cacheSet(key, value, ttlMs) {
+  CACHE.set(key, { value, expireAt: ttlMs ? Date.now() + ttlMs : 0 });
+}
+
 async function discoverTransitionPairs(issues, since, until) {
   const pairs = new Map(); // key: `${from}→${to}` => count
   for (const issue of issues) {
@@ -158,8 +170,9 @@ function withinWindow(ts, since, until) {
 
 async function countTransitionsByUser(issues, fromName, toName, since, until, notFromName, notToName) {
   const counts = new Map(); // author.displayName => number
-  for (const issue of issues) {
-    // paginate changelog in case of long history
+
+  // Concurrency-limited worker pool
+  async function processIssue(issue) {
     let startAt = 0;
     let total = 0;
     do {
@@ -167,7 +180,6 @@ async function countTransitionsByUser(issues, fromName, toName, since, until, no
       total = log.total || 0;
       const histories = Array.isArray(log.values) ? log.values : [];
       for (const h of histories) {
-        // author might be null for some system events
         const authorName = h.author && (h.author.displayName || h.author.name || h.author.accountId) || 'Unknown';
         const created = h.created;
         if (since || until) {
@@ -189,6 +201,23 @@ async function countTransitionsByUser(issues, fromName, toName, since, until, no
       if (histories.length === 0) break;
     } while (startAt < total);
   }
+
+  async function mapLimit(arr, limit, iter) {
+    const pending = new Set();
+    for (const item of arr) {
+      const p = Promise.resolve().then(() => iter(item));
+      pending.add(p);
+      p.finally(() => pending.delete(p));
+      if (pending.size >= limit) {
+        await Promise.race(pending);
+      }
+    }
+    await Promise.all(pending);
+  }
+
+  const concurrency = Math.max(1, Math.min(10, Number(process.env.MOVERS_CONCURRENCY || 5)));
+  await mapLimit(issues, concurrency, processIssue);
+
   const arr = Array.from(counts.entries()).map(([user, count]) => ({ user, count }));
   arr.sort((a,b) => b.count - a.count || a.user.localeCompare(b.user));
   return arr;
@@ -205,6 +234,9 @@ exports.handler = async (event) => {
     const since = params.get('since');
     const until = params.get('until');
     const limit = Math.min(parseInt(params.get('limit') || '20', 10) || 20, 100);
+    const maxIssues = Math.min(parseInt(params.get('maxIssues') || '150', 10) || 150, 1000);
+    const concurrencyParam = Math.min(parseInt(params.get('concurrency') || '0', 10) || 0, 20);
+    const ttl = Math.min(parseInt(params.get('ttl') || '60', 10) || 60, 600) * 1000; // default 60s
     const discover = params.get('discover') === '1';
 
     if (!filter) {
@@ -217,21 +249,34 @@ exports.handler = async (event) => {
 
     // Build JQL: if it's filter=NN, Jira will handle it; if it's JQL, we use it as-is.
     const jql = jqlOrFilter.startsWith('filter=') ? jqlOrFilter : jqlOrFilter;
-    const issues = await searchIssues(jql, 500);
+
+    const cacheKey = JSON.stringify({ jql, from, to, notFrom, notTo, since, until, limit, maxIssues, concurrencyParam });
+    const cached = cacheGet(cacheKey);
+    if (cached) {
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json; charset=utf-8', 'X-Cache': 'HIT' },
+        body: JSON.stringify(cached),
+      };
+    }
+
+    const issues = await searchIssues(jql, maxIssues);
 
     if (discover) {
       const pairs = await discoverTransitionPairs(issues, since, until);
       const topPairs = pairs.slice(0, Math.min(limit, 100));
-      return {
+      const payload = {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
         body: JSON.stringify({ filter, since: since || null, until: until || null, totalIssues: issues.length, transitions: topPairs }),
       };
+      cacheSet(cacheKey, JSON.parse(payload.body), ttl);
+      return payload;
     }
 
     const results = await countTransitionsByUser(issues, from, to, since, until, notFrom, notTo);
     const top = results.slice(0, limit);
-    return {
+    const payload = {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
       body: JSON.stringify({
@@ -246,6 +291,8 @@ exports.handler = async (event) => {
         users: top,
       }),
     };
+    cacheSet(cacheKey, JSON.parse(payload.body), ttl);
+    return payload;
   } catch (err) {
     return { statusCode: 500, body: JSON.stringify({ error: String(err && err.message || err) }) };
   }
