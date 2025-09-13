@@ -60,6 +60,43 @@
 
       <p class="hint">Tip: All metrics are clickable Jira links. <br> Note: Manual aggregation may show minor mismatches if issues are reopened during the event.</p>
 
+      <section class="filters" aria-labelledby="movers-title" id="movers">
+        <h2 id="movers-title">Top Movers</h2>
+        <p class="filters-note">Top movers for QA and Dev</p>
+        <div class="movers-grid">
+          <div>
+            <h3 class="movers-head">QA</h3>
+            <table class="movers-table">
+              <thead>
+                <tr>
+                  <th style="width:56px;">Rank</th>
+                  <th>User</th>
+                  <th style="width:80px; text-align:right;">Count</th>
+                </tr>
+              </thead>
+              <tbody id="movers-qa-body">
+                <tr><td colspan="3" class="muted">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <h3 class="movers-head">Dev</h3>
+            <table class="movers-table">
+              <thead>
+                <tr>
+                  <th style="width:56px;">Rank</th>
+                  <th>User</th>
+                  <th style="width:80px; text-align:right;">Count</th>
+                </tr>
+              </thead>
+              <tbody id="movers-dev-body">
+                <tr><td colspan="3" class="muted">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <section class="filters" aria-labelledby="total-title">
         <h2 id="total-title">Closed During BugBash: <span id="total-today">—</span></h2>
         <p class="filters-note">Sum of QA and Dev closed during the event.</p>

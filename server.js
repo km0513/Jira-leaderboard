@@ -24,6 +24,116 @@ function loadEnv(envPath = path.join(__dirname, '.env')) {
   }
 }
 
+function getAuthHeaders() {
+  if (!JIRA_BASE_URL || !JIRA_EMAIL || !JIRA_API_TOKEN) {
+    throw new Error('Missing Jira configuration (JIRA_BASE_URL/JIRA_EMAIL/JIRA_API_TOKEN)');
+  }
+  const auth = Buffer.from(`${JIRA_EMAIL}:${JIRA_API_TOKEN}`).toString('base64');
+  return {
+    'Authorization': `Basic ${auth}`,
+    'Accept': 'application/json',
+    'User-Agent': 'jira-leaderboard-webview/1.4',
+  };
+}
+
+async function searchIssues(jql, max = 200) {
+  const base = JIRA_BASE_URL.replace(/\/$/, '');
+  const headers = getAuthHeaders();
+  const jqlParam = encodeURIComponent(jql);
+  const fields = encodeURIComponent('key');
+  const url = `${base}/rest/api/3/search?jql=${jqlParam}&maxResults=${Math.min(max, 1000)}&fields=${fields}`;
+  const res = await fetchJSON(url, { headers });
+  const issues = Array.isArray(res.issues) ? res.issues : [];
+  return issues.map(it => ({ key: it.key, id: it.id }));
+}
+
+async function fetchChangelog(issueId, startAt = 0, maxResults = 100) {
+  const base = JIRA_BASE_URL.replace(/\/$/, '');
+  const headers = getAuthHeaders();
+  const url = `${base}/rest/api/3/issue/${issueId}/changelog?startAt=${startAt}&maxResults=${maxResults}`;
+  return fetchJSON(url, { headers });
+}
+
+function withinWindow(ts, since, until) {
+  const t = new Date(ts).getTime();
+  if (Number.isNaN(t)) return false;
+  if (since && t < new Date(since).getTime()) return false;
+  if (until && t > new Date(until).getTime()) return false;
+  return true;
+}
+
+async function countTransitionsByUser(issues, fromName, toName, since, until, notFromName, notToName) {
+  const counts = new Map(); // author.displayName => number
+  for (const issue of issues) {
+    let startAt = 0;
+    let total = 0;
+    do {
+      const log = await fetchChangelog(issue.id, startAt, 100);
+      total = log.total || 0;
+      const histories = Array.isArray(log.values) ? log.values : [];
+      for (const h of histories) {
+        const authorName = h.author && (h.author.displayName || h.author.name || h.author.accountId) || 'Unknown';
+        const created = h.created;
+        if (since || until) {
+          if (!withinWindow(created, since, until)) continue;
+        }
+        const items = Array.isArray(h.items) ? h.items : [];
+        for (const it of items) {
+          if (it.field !== 'status') continue;
+          const from = (it.fromString || '').trim();
+          const to = (it.toString || '').trim();
+          const fromOk = (!fromName || from.toLowerCase() === String(fromName).toLowerCase()) && (!notFromName || from.toLowerCase() !== String(notFromName).toLowerCase());
+          const toOk = (!toName || to.toLowerCase() === String(toName).toLowerCase()) && (!notToName || to.toLowerCase() !== String(notToName).toLowerCase());
+          if (fromOk && toOk) {
+            counts.set(authorName, (counts.get(authorName) || 0) + 1);
+          }
+        }
+      }
+      startAt += histories.length;
+      if (histories.length === 0) break;
+    } while (startAt < total);
+  }
+  const arr = Array.from(counts.entries()).map(([user, count]) => ({ user, count }));
+  arr.sort((a, b) => b.count - a.count || a.user.localeCompare(b.user));
+  return arr;
+}
+
+async function handleMovers(req, res) {
+  try {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const filter = url.searchParams.get('filter');
+    const from = url.searchParams.get('from');
+    const to = url.searchParams.get('to');
+    const notFrom = url.searchParams.get('notFrom');
+    const notTo = url.searchParams.get('notTo');
+    const since = url.searchParams.get('since');
+    const until = url.searchParams.get('until');
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10) || 20, 100);
+
+    if (!filter) return sendJSON(res, 400, { error: 'Missing required query param: filter' });
+    const jqlOrFilter = toJql(filter);
+    if (!jqlOrFilter) return sendJSON(res, 400, { error: 'Invalid filter/JQL' });
+
+    const jql = jqlOrFilter; // filter=NN or raw JQL
+    const issues = await searchIssues(jql, 500);
+    const results = await countTransitionsByUser(issues, from, to, since, until, notFrom, notTo);
+    const top = results.slice(0, limit);
+    return sendJSON(res, 200, {
+      filter,
+      from: from || null,
+      to: to || null,
+      notFrom: notFrom || null,
+      notTo: notTo || null,
+      since: since || null,
+      until: until || null,
+      totalIssues: issues.length,
+      users: top,
+    });
+  } catch (err) {
+    return sendJSON(res, 500, { error: String(err && err.message || err) });
+  }
+}
+
 loadEnv();
 
 // Sanitize env strings and strip quotes/whitespace
@@ -243,6 +353,7 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/script.js') return staticFile('script.js', res);
   if (url.pathname === '/styles.css') return staticFile('styles.css', res);
   if (url.pathname === '/api/counts') return handleCounts(req, res);
+  if (url.pathname === '/api/movers') return handleMovers(req, res);
   if (url.pathname === '/api/filters') {
     const payload = {
       baseUrl: (JIRA_BASE_URL || '').replace(/\/$/, ''),

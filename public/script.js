@@ -147,7 +147,11 @@ async function fetchCounts() {
   } catch (_) {
     // keep default refresh if first load failed
   }
+  // Initial movers render (non-blocking)
+  renderMovers().catch(() => {});
   setInterval(fetchCounts, refreshMs);
+  // Refresh movers at the same cadence
+  setInterval(() => renderMovers().catch(() => {}), refreshMs);
 })();
 
 // Countdown to the next 15th 6:00 PM IST
@@ -210,6 +214,79 @@ async function fetchCounts() {
   tick();
   setInterval(tick, 1000);
 })();
+
+// Helpers
+function getQueryParam(name) {
+  const u = new URL(window.location.href);
+  return u.searchParams.get(name);
+}
+
+async function renderMovers() {
+  const qaTbody = document.getElementById('movers-qa-body');
+  const devTbody = document.getElementById('movers-dev-body');
+  if (!qaTbody || !devTbody) return; // section not present
+
+  const since = getQueryParam('since'); // ISO string optional
+  const limit = 10;
+
+  // Build endpoints
+  // QA: from Resolved
+  const qaFilter = FILTERS?.qaToday?.url || FILTERS?.qaToday?.text || '';
+  // Dev: to Resolved
+  const devFilter = FILTERS?.devToday?.url || FILTERS?.devToday?.text || '';
+
+  async function loadList(tbody, qs) {
+    try {
+      tbody.innerHTML = '<tr><td colspan="3" class="muted">Loading…</td></tr>';
+      const qp = new URLSearchParams(qs);
+      const resp = await fetch(`/api/movers?${qp.toString()}`, { cache: 'no-store' });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      const users = Array.isArray(data.users) ? data.users : [];
+      if (!users.length) { tbody.innerHTML = '<tr><td colspan="3" class="muted">No transitions found</td></tr>'; return; }
+      // Show only top 4 and render plain text (no links)
+      const top = users.slice(0, 4);
+      function initials(name) {
+        try {
+          const parts = String(name).trim().split(/\s+/).filter(Boolean);
+          const a = parts[0] ? parts[0][0] : '';
+          const b = parts.length > 1 ? parts[parts.length - 1][0] : '';
+          return (a + b).toUpperCase() || (String(name)[0] || '?').toUpperCase();
+        } catch { return '?'; }
+      }
+      tbody.innerHTML = top.map((u, i) => `
+        <tr>
+          <td class="rank-cell"><span class="rank-badge">${i + 1}</span>${i === 0 ? '<span class="trophy-mini" aria-label="Top performer">🏆</span>' : ''}</td>
+          <td class="user-cell"><span class="avatar">${initials(u.user)}</span><span class="user-name">${u.user}</span></td>
+          <td class="count-cell">${u.count}</td>
+        </tr>
+      `).join('');
+    } catch (e) {
+      console.error('movers error', e);
+      tbody.innerHTML = '<tr><td colspan="3" class="muted">Failed to load</td></tr>';
+    }
+  }
+
+  if (!qaFilter) {
+    qaTbody.innerHTML = '<tr><td colspan="3" class="muted">QA Today filter not configured</td></tr>';
+  }
+  if (!devFilter) {
+    devTbody.innerHTML = '<tr><td colspan="3" class="muted">Dev Today filter not configured</td></tr>';
+  }
+
+  const tasks = [];
+  if (qaFilter) {
+    const qaParams = { filter: qaFilter, from: 'Resolved', notTo: 'Done', limit: String(limit) };
+    if (since) qaParams.since = since;
+    tasks.push(loadList(qaTbody, qaParams));
+  }
+  if (devFilter) {
+    const devParams = { filter: devFilter, to: 'Resolved', limit: String(limit) };
+    if (since) devParams.since = since;
+    tasks.push(loadList(devTbody, devParams));
+  }
+  await Promise.all(tasks);
+}
 
 // Theme toggle (auto + manual), persisted in localStorage
 (function setupThemeToggle() {
