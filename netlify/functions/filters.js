@@ -16,6 +16,9 @@ const JIRA_FILTER_DEV_ID = cleanEnv(process.env.JIRA_FILTER_DEV_ID);
 const JIRA_DEV_TODAY = cleanEnv(process.env.JIRA_DEV_TODAY);
 const JIRA_QA_TODAY = cleanEnv(process.env.JIRA_QA_TODAY);
 const JIRA_DEPLOYMENTREADY = cleanEnv(process.env.JIRA_DEPLOYMENTREADY);
+// New: Pre-bugbash filters
+const JIRA_PRE_DEV = cleanEnv(process.env.JIRA_PRE_DEV);
+const JIRA_PRE_QA = cleanEnv(process.env.JIRA_PRE_QA);
 
 if (JIRA_BASE_URL && !/^https?:\/\//i.test(JIRA_BASE_URL)) {
   JIRA_BASE_URL = 'https://' + JIRA_BASE_URL;
@@ -59,6 +62,8 @@ exports.handler = async () => {
     baseUrl: (JIRA_BASE_URL || '').replace(/\/$/, ''),
     qa: buildFilterInfo('QA', JIRA_FILTER_QA_ID),
     dev: buildFilterInfo('Dev', JIRA_FILTER_DEV_ID),
+    preDev: buildFilterInfo('Pre Dev', JIRA_PRE_DEV),
+    preQa: buildFilterInfo('Pre QA', JIRA_PRE_QA),
     devToday: buildFilterInfo('Dev Today', JIRA_DEV_TODAY),
     qaToday: buildFilterInfo('QA Today', JIRA_QA_TODAY),
     deploymentReady: buildFilterInfo('Deployment Ready', JIRA_DEPLOYMENTREADY),

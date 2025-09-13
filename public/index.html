@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#4f46e5" />
-    <title>Jira Leaderboard</title>
+    <title>PRISM BugBash Status Board</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -14,18 +14,17 @@
   <body>
     <main>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-        <h1>Bug-Bash Leaderboard</h1>
+        <h1>PRISM BugBash Status Board</h1>
         <button id="theme-toggle" aria-label="Toggle dark mode" class="theme-toggle">🌙</button>
       </div>
-      <div id="status" class="status">Loading…</div>
 
       <section class="countdown" aria-labelledby="countdown-title">
         <h2 id="countdown-title">Event Countdown</h2>
         <div class="countdown-row">
-          <div class="countdown-kpi"><span id="cd-days">0</span><label>Days</label></div>
-          <div class="countdown-kpi"><span id="cd-hours">0</span><label>Hours</label></div>
-          <div class="countdown-kpi"><span id="cd-mins">0</span><label>Mins</label></div>
-          <div class="countdown-kpi"><span id="cd-secs">0</span><label>Secs</label></div>
+          <div class="countdown-kpi"><span id="cd-days">0</span><label>🗓 Days</label></div>
+          <div class="countdown-kpi"><span id="cd-hours">0</span><label>⏰ Hours</label></div>
+          <div class="countdown-kpi"><span id="cd-mins">0</span><label>⏱ Mins</label></div>
+          <div class="countdown-kpi"><span id="cd-secs">0</span><label>🔁 Secs</label></div>
         </div>
         <p class="countdown-note">Counting down to 15th, 6:00 PM IST (<span id="cd-target-local"></span> local)</p>
       </section>
@@ -34,39 +33,52 @@
         <thead>
           <tr>
             <th>Team</th>
-            <th>To be Closed</th>
-            <th>Closed Today</th>
+            <th>Pre BugBash</th>
+            <th>Closed During BugBash</th>
+            <th>Pending Closure</th>
+
           </tr>
         </thead>
         <tbody id="rows">
           <tr id="row-qa">
             <td>QA</td>
-            <td id="qa-current">—</td>
+            <td id="qa-pre">—</td>
             <td id="qa-today">—</td>
+            <td id="qa-current">—</td>
           </tr>
           <tr id="row-dev">
             <td>Dev</td>
-            <td id="dev-current">—</td>
+            <td id="dev-pre">—</td>
             <td id="dev-today">—</td>
+            <td id="dev-current">—</td>
+
           </tr>
-          <tr class="lead" id="row-lead">
-            <td>Lead</td>
-            <td id="lead-team" colspan="2">—</td>
-          </tr>
+          
         </tbody>
       </table>
+      <div id="status" class="status">Loading…</div>
 
-      <p class="hint">Tip: All metrics are clickable Jira links.</p>
+      <p class="hint">Tip: All metrics are clickable Jira links. <br> Note: Manual aggregation may show minor mismatches if issues are reopened during the event.</p>
+
+      <section class="filters" aria-labelledby="total-title">
+        <h2 id="total-title">Closed During BugBash: <span id="total-today">—</span></h2>
+        <p class="filters-note">Sum of QA and Dev closed during the event.</p>
+      </section>
+
+      <section class="filters" aria-labelledby="pending-title">
+        <h2 id="pending-title">Pending Closure: <span id="total-pending">—</span></h2>
+        <p class="filters-note">Sum of QA and Dev pending closure.</p>
+      </section>
 
             <section class="filters" aria-labelledby="deploy-title">
-        <h2 id="deploy-title">Deployment Ready (Prod):  <span id="deployment-ready">—</span></h2>
+        <h2 id="deploy-title">Production Deployment Ready:  <span id="deployment-ready">—</span></h2>
         
         <p class="filters-note">Issues marked deployment-ready to be pushed to prod.</p>
        
       </section>
 
       <footer class="app-foot">
-        <span>Built for the Bug‑Bash • Auto updates every minute</span>
+        <span>Built for the BugBash • Auto updates every minute</span>
       </footer>
 
 <script src="/script.js"></script>
