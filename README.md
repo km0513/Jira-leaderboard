@@ -22,8 +22,8 @@ A tiny Node server that serves a stylish leaderboard UI and securely proxies Jir
    JIRA_API_TOKEN=your_api_token
    
    # Required filters/JQL (either numeric filter ID or raw JQL)
-   JIRA_FILTER_QA_ID=14621
-   JIRA_FILTER_DEV_ID=10930
+   JIRA_FILTER_QA_ID=
+   JIRA_FILTER_DEV_ID=
    
    # Optional extras
    JIRA_QA_TODAY=
@@ -54,8 +54,8 @@ docker run -d -p 5173:5173 \
   -e JIRA_BASE_URL="https://your-domain.atlassian.net" \
   -e JIRA_EMAIL="you@example.com" \
   -e JIRA_API_TOKEN="<token>" \
-  -e JIRA_FILTER_QA_ID="14621" \
-  -e JIRA_FILTER_DEV_ID="10930" \
+  -e JIRA_FILTER_QA_ID= \
+  -e JIRA_FILTER_DEV_ID=\
   -e JIRA_QA_TODAY="" \
   -e JIRA_DEV_TODAY="" \
   -e JIRA_DEPLOYMENTREADY="" \
