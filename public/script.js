@@ -111,7 +111,7 @@ async function fetchCounts() {
     // Neutral status board: no leader/trophy or row highlighting
 
     const ts = new Date().toLocaleTimeString();
-    status.textContent = `Updated at ${ts}${data.refreshSeconds ? ` · Auto-refresh ${data.refreshSeconds}s` : ''}`;
+    status.textContent = `Updated at ${ts}`;
     return data;
   } catch (err) {
     status.textContent = 'Failed to load counts: ' + (err && err.message || err);
@@ -149,9 +149,7 @@ async function fetchCounts() {
   }
   // Initial movers render (non-blocking)
   renderMovers().catch(() => {});
-  setInterval(fetchCounts, refreshMs);
-  // Refresh movers at the same cadence
-  setInterval(() => renderMovers().catch(() => {}), refreshMs);
+  // Auto-refresh disabled as requested
 })();
 
 // Countdown to the next 15th 6:00 PM IST
@@ -227,7 +225,7 @@ async function renderMovers() {
   if (!qaTbody || !devTbody) return; // section not present
 
   const since = getQueryParam('since'); // ISO string optional
-  const limit = 10;
+  const limit = 100; // request up to 100 users
 
   // Build endpoints
   // QA: from Resolved
@@ -244,8 +242,8 @@ async function renderMovers() {
       const data = await resp.json();
       const users = Array.isArray(data.users) ? data.users : [];
       if (!users.length) { tbody.innerHTML = '<tr><td colspan="3" class="muted">No transitions found</td></tr>'; return; }
-      // Show only top 4 and render plain text (no links)
-      const top = users.slice(0, 4);
+      // Show full list (no slicing)
+      const top = users;
       function initials(name) {
         try {
           const parts = String(name).trim().split(/\s+/).filter(Boolean);
