@@ -31,7 +31,7 @@ A tiny Node server that serves a stylish leaderboard UI and securely proxies Jir
    JIRA_DEPLOYMENTREADY=
 
    # App
-   PORT=5173
+   PORT=
    REFRESH_SECONDS=60
    ```
 2. Run the server:
@@ -50,7 +50,7 @@ docker build -t jira-leaderboard:latest .
 
 # Run (replace env values)
 docker run -d -p 5173:5173 \
-  -e PORT=5173 \
+  -e PORT= \
   -e JIRA_BASE_URL="https://your-domain.atlassian.net" \
   -e JIRA_EMAIL="you@example.com" \
   -e JIRA_API_TOKEN="<token>" \
