@@ -20,6 +20,9 @@ const JIRA_FILTER_QA_ID = cleanEnv(process.env.JIRA_FILTER_QA_ID);
 const JIRA_FILTER_DEV_ID = cleanEnv(process.env.JIRA_FILTER_DEV_ID);
 const JIRA_DEV_TODAY = cleanEnv(process.env.JIRA_DEV_TODAY);
 const JIRA_QA_TODAY = cleanEnv(process.env.JIRA_QA_TODAY);
+// New: Pre-bugbash filters
+const JIRA_PRE_DEV = cleanEnv(process.env.JIRA_PRE_DEV);
+const JIRA_PRE_QA = cleanEnv(process.env.JIRA_PRE_QA);
 const JIRA_DEPLOYMENTREADY = cleanEnv(process.env.JIRA_DEPLOYMENTREADY);
 const REFRESH_SECONDS = Number(cleanEnv(process.env.REFRESH_SECONDS) || 60);
 
@@ -109,6 +112,8 @@ exports.handler = async () => {
     ];
     if (JIRA_DEV_TODAY) tasks.push(fetchFilterCount(JIRA_DEV_TODAY));
     if (JIRA_QA_TODAY) tasks.push(fetchFilterCount(JIRA_QA_TODAY));
+    if (JIRA_PRE_DEV) tasks.push(fetchFilterCount(JIRA_PRE_DEV));
+    if (JIRA_PRE_QA) tasks.push(fetchFilterCount(JIRA_PRE_QA));
     const includeDeploy = !!JIRA_DEPLOYMENTREADY;
     if (includeDeploy) tasks.push(fetchFilterCount(JIRA_DEPLOYMENTREADY));
 
@@ -118,12 +123,14 @@ exports.handler = async () => {
     let idx = 2;
     const devToday = JIRA_DEV_TODAY ? results[idx++] : undefined;
     const qaToday = JIRA_QA_TODAY ? results[idx++] : undefined;
+    const preDev = JIRA_PRE_DEV ? results[idx++] : undefined;
+    const preQa = JIRA_PRE_QA ? results[idx++] : undefined;
     const deploymentReady = includeDeploy ? results[idx++] : undefined;
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
-      body: JSON.stringify({ qa, dev, devToday, qaToday, deploymentReady, refreshSeconds: REFRESH_SECONDS }),
+      body: JSON.stringify({ qa, dev, devToday, qaToday, preDev, preQa, deploymentReady, refreshSeconds: REFRESH_SECONDS }),
     };
   } catch (err) {
     return {
